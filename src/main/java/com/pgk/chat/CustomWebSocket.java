@@ -35,6 +35,7 @@ public class CustomWebSocket {
      * 用户名
      */
     private String userName;
+
     /**
      * 连接建立成功调用的方法
      *
@@ -51,15 +52,12 @@ public class CustomWebSocket {
         for (Map.Entry<String, CustomWebSocket> entry : webSocketMap.entrySet()) {
             userNames.add(entry.getKey());
         }
-
         System.out.println(userNames);
-       map.put("userNames",userNames);
+        map.put("userNames", userNames);
         map.put("onLineCount", getOnlineCount());
         map.put("userName", userName);
         CustomWebSocket.sendAll(map);
         //添加在线人数
-
-
         System.out.println("新连接接入。当前在线人数为：" + getOnlineCount());
     }
 
@@ -69,9 +67,11 @@ public class CustomWebSocket {
     @OnClose
     public void onClose() {
         //从set中删除
+
         webSocketMap.remove(userName);
         //在线数减1
         subOnlineCount();
+        userNames.remove(userName);
         System.out.println("有连接关闭。当前在线人数为：" + getOnlineCount());
     }
 
@@ -82,9 +82,19 @@ public class CustomWebSocket {
      * @param session
      */
     @OnMessage
-    public void onMessage(String message, Session session) {
+    public void onMessage(String message, Session session) throws Exception {
+
         System.out.println("客户端发送的消息：" + message);
-        // CustomWebSocket.sendAll(message);
+        JSONObject object = JSONObject.parseObject(message);
+        String to = (String) object.get("to");
+        if (to.equals("All")){
+             CustomWebSocket.sendAll1(object);
+        } else {
+            CustomWebSocket.sendTo((String) object.get("to"),message);
+        }
+
+
+
     }
 
 
@@ -95,24 +105,13 @@ public class CustomWebSocket {
      * @param message
      */
     private static void sendTo(String userName, String message) {
-        webSocketMap.get(userName).session.getAsyncRemote().sendText(message);
-    }
-
-    /**
-     * 在线人数
-     *
-     * @param count
-     */
-    private static void sendCount(int count) {
-
-        for (CustomWebSocket item : webSocketMap.values()) {
-            try {
-                item.session.getBasicRemote().sendText(String.valueOf(count));
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        try {
+            webSocketMap.get(userName).sendMessage(message);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
+
 
 
     /**
@@ -122,11 +121,28 @@ public class CustomWebSocket {
      */
     private static void sendAll(HashMap<String, Object> map) {
         for (CustomWebSocket item : webSocketMap.values()) {
-            item.session.getAsyncRemote().sendText(String.valueOf(JSONObject.toJSON(map)));
-
+            try {
+                item.sendMessage(String.valueOf(JSONObject.toJSON(map)));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+         //   item.session.getAsyncRemote().sendText(String.valueOf(JSONObject.toJSON(map)));
         }
 
     }
+    private static void sendAll1(JSONObject message) {
+
+        for (CustomWebSocket item : webSocketMap.values()) {
+            try {
+                item.session.getAsyncRemote().sendText(String.valueOf(message));
+            }catch (Exception e ){
+                e.printStackTrace();
+            }
+
+        }
+    }
+
+
 
 //        webSocketMap.keySet().forEach(item ->{
 //            CustomWebSocket customWebSocket = webSocketMap.get(item);
@@ -190,9 +206,6 @@ public class CustomWebSocket {
      * @throws IOException
      */
     public void sendMessage(String message) throws IOException {
-        //获取session远程基本连接发送文本消息
-        //  this.session.getBasicRemote().sendText("欢迎"+userName+"进入聊天室");
-        // this.session.getAsyncRemote().sendText(message);
         this.session.getBasicRemote().sendText(message);
     }
 
